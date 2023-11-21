@@ -118,6 +118,7 @@ int main(int argc, char **argv)
     octx.flush();
 
 
+    Timestamp lastPts, lastDts, step;
     //
     // PROCESS
     //
@@ -140,6 +141,28 @@ int main(int argc, char **argv)
             clog << "Read packet: pts=" << pkt.pts() << ", dts=" << pkt.dts() << " / " << pkt.pts().seconds() << " / " << pkt.timeBase() << " / st: " << pkt.streamIndex() << endl;
         } else {
             flushDecoder = true;
+        }
+
+        if (!pkt.pts().isNoPts()) {
+            if (!lastPts.isNoPts()) {
+                step = pkt.pts() - lastPts;
+            }
+            lastPts = pkt.pts();
+        } else {
+            if (step.isNoPts() || lastPts.isNoPts()) {
+                clog << "Cannot determine the framerate" << endl;
+                return 1;
+            }
+            lastPts += step;
+        }
+        if (!pkt.dts().isNoPts()) {
+            lastDts = pkt.dts();
+        } else {
+            if (step.isNoPts() || lastDts.isNoPts()) {
+                clog << "Cannot determine the framerate" << endl;
+                return 1;
+            }
+            lastDts += step;
         }
 
         do {
@@ -191,6 +214,8 @@ int main(int argc, char **argv)
 
                     // Only one output stream
                     opkt.setStreamIndex(0);
+                    opkt.setPts(lastPts);
+                    opkt.setDts(lastDts);
 
                     clog << "Write packet: pts=" << opkt.pts() << ", dts=" << opkt.dts() << " / " << opkt.pts().seconds() << " / " << opkt.timeBase() << " / st: " << opkt.streamIndex() << endl;
 
